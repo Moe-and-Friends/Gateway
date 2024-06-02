@@ -26,8 +26,8 @@ func main() {
 	in := make(chan DebounceEvent[inputEvent])
 	out := make(chan inputEvent)
 
-	go StartDebouncer[inputEvent](c, ctx, in, out)
+	go StartAmqp(c, ctx, out)
+	go StartDebouncer(c, ctx, in, out)
 
 	// TODO: Add support for incoming HTTP events
-
 }
