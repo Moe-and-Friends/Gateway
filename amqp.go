@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"time"
 
+	config "Gateway/config"
+	handle "Gateway/handle"
+
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-func StartAmqp[T any](c Config, ctx context.Context, in <-chan T) {
+func StartAmqp[T any](c config.Config, ctx context.Context, in <-chan T) {
 
 	conn, err := amqp.Dial(
 		fmt.Sprintf("amqp://%s:%s@%s:%s/%s",
@@ -19,11 +22,11 @@ func StartAmqp[T any](c Config, ctx context.Context, in <-chan T) {
 			c.Amqp.Port,
 			c.Amqp.Vhost,
 		))
-	failOnError(err, "Failed to connect to RabbitMQ")
+	handle.FailOnError(err, "Failed to connect to RabbitMQ")
 	defer conn.Close()
 
 	ch, err := conn.Channel()
-	failOnError(err, "Failed to open a channel")
+	handle.FailOnError(err, "Failed to open a channel")
 	defer ch.Close()
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -35,7 +38,7 @@ func StartAmqp[T any](c Config, ctx context.Context, in <-chan T) {
 		}
 
 		body, err := json.Marshal(e)
-		failOnError(err, "Failed to marshal the input event")
+		handle.FailOnError(err, "Failed to marshal the input event")
 
 		err = ch.PublishWithContext(
 			ctx,             // context
@@ -48,6 +51,6 @@ func StartAmqp[T any](c Config, ctx context.Context, in <-chan T) {
 				Body:        body,
 			},
 		)
-		failOnError(err, "Failed to publish event")
+		handle.FailOnError(err, "Failed to publish event")
 	}
 }

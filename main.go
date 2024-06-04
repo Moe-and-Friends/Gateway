@@ -2,32 +2,57 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net/http"
+
+	config "Gateway/config"
+	handle "Gateway/handle"
+	timeout "Gateway/routes/timeout"
 
 	envconfig "github.com/kelseyhightower/envconfig"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-func failOnError(err error, msg string) {
-	if err != nil {
-		log.Panicf("%s: %s", msg, err)
-	}
+func CreateAMQP(c config.Config) *amqp.Connection {
+	conn, err := amqp.Dial(
+		fmt.Sprintf("amqp://%s:%s@%s:%s/%s",
+			c.Amqp.Username,
+			c.Amqp.Password,
+			c.Amqp.Url,
+			c.Amqp.Port,
+			c.Amqp.Vhost,
+		))
+	handle.FailOnError(err, "Failed to connect to RabbitMQ")
+	return conn
 }
-
-type inputEvent struct{}
 
 func main() {
 
-	var c Config
+	var c config.Config
 	err := envconfig.Process("Gateway", &c)
-	failOnError(err, "Failed to load config")
+	handle.FailOnError(err, "Failed to load config")
+
+	conn := CreateAMQP(c)
+	defer conn.Close()
 
 	var ctx = context.Background()
 
-	in := make(chan DebounceEvent[inputEvent])
-	out := make(chan inputEvent)
+	// Handle requests to enqueue a timeout event.
+	ter := make(chan timeout.EnqueueRequest)
+	go timeout.StartTimeoutEnqueue(ter, ctx, conn, c.Amqp.Exchange)
+	http.HandleFunc("/timeout/enqueue", func(w http.ResponseWriter, r *http.Request) {
+		er, err := timeout.Create(r.Body)
+		if err != nil {
+			w.WriteHeader(400)
+			return
+		}
 
-	go StartAmqp(c, ctx, out)
-	go StartDebouncer(c, ctx, in, out)
+		log.Printf("Processing message sent by %s@%s", er.Discord.Author.UserDisplayName, er.Discord.Author.UserId)
+		ter <- er
+		w.WriteHeader(201)
+	})
 
-	// TODO: Add support for incoming HTTP events
+	log.Println("Now listening for requests on port 8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
