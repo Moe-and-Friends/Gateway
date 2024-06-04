@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log"
 	"time"
 
 	handle "Gateway/handle"
@@ -75,6 +76,10 @@ func StartTimeoutEnqueue(c <-chan EnqueueRequest, ctx context.Context, conn *amq
 
 		if err != nil {
 			handle.FailOnError(err, "Failed to publish event to AMQP")
+		} else {
+			log.Printf("Published event from %s@%s to the AMQP broker",
+				e.Discord.Author.UserDisplayName,
+				e.Discord.Author.UserId)
 		}
 	}
 }

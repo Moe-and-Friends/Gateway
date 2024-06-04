@@ -48,7 +48,9 @@ func main() {
 			return
 		}
 
-		log.Printf("Processing message sent by %s@%s", er.Discord.Author.UserDisplayName, er.Discord.Author.UserId)
+		log.Printf("Processing message sent by %s@%s",
+			er.Discord.Author.UserDisplayName,
+			er.Discord.Author.UserId)
 		ter <- er
 		w.WriteHeader(201)
 	})
